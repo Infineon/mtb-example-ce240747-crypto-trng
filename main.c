@@ -8,7 +8,7 @@
 *
 *
 *******************************************************************************
-* Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2024-2025, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -46,6 +46,7 @@
 #include "cy_pdl.h"
 #include "cybsp.h"  
 #include "cy_retarget_io.h"
+#include "mtb_hal.h"
 
 /*******************************************************************************
 * Macros
@@ -91,6 +92,9 @@ static cy_en_scb_uart_status_t get_character(CySCB_Type * base, \
                                              uint8_t *value,    \
                                              uint32_t timeout);
 
+/* For the Retarget -IO (Debug UART) usage */
+static cy_stc_scb_uart_context_t    UART_context;           /** UART context */
+static mtb_hal_uart_t               UART_hal_obj;           /** Debug UART HAL object  */
 /*******************************************************************************
 * Function Name: main 
 ********************************************************************************
@@ -122,18 +126,33 @@ int main(void)
     /* Enable global interrupts */
     __enable_irq();
     
-    /* Initialize retarget-io to use the debug UART port */
-    Cy_SCB_UART_Init(UART_HW, &UART_config, NULL);
-    Cy_SCB_UART_Enable(UART_HW);
-    result = cy_retarget_io_init(UART_HW);
-    
-    /* retarget-io init failed. Stop program execution */
-    if (CY_RSLT_SUCCESS != result)
+    /* Debug UART init */
+    result = (cy_rslt_t)Cy_SCB_UART_Init(UART_HW, &UART_config, &UART_context);
+
+    /* UART init failed. Stop program execution */
+    if (result != CY_RSLT_SUCCESS)
     {
         CY_ASSERT(0);
     }
 
-    printf("retarget-io ver1.6 testing \r\n");
+    Cy_SCB_UART_Enable(UART_HW);
+
+    /* Setup the HAL UART */
+    result = mtb_hal_uart_setup(&UART_hal_obj, &UART_hal_config, &UART_context, NULL);
+
+    /* HAL UART init failed. Stop program execution */
+    if (result != CY_RSLT_SUCCESS)
+    {
+        CY_ASSERT(0);
+    }
+
+    result = cy_retarget_io_init(&UART_hal_obj);
+
+    /* HAL retarget_io init failed. Stop program execution */
+    if (result != CY_RSLT_SUCCESS)
+    {
+        CY_ASSERT(0);
+    }
 
     /* \x1b[2J\x1b[;H - ANSI ESC sequence for clear screen */
     printf(CLEAR_SCREEN);
